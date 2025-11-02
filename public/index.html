@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WhatsApp Bot - Pair</title>
+  <style>
+    body { font-family: Arial; background: #0e1117; color: white; text-align: center; margin-top: 80px; }
+    input, button { padding: 10px; font-size: 16px; margin: 10px; border-radius: 8px; border: none; }
+    input { width: 250px; }
+    button { background: #25D366; color: white; cursor: pointer; }
+    #code { margin-top: 20px; font-size: 20px; color: #25D366; }
+  </style>
+</head>
+<body>
+  <h1>🔗 WhatsApp Pairing</h1>
+  <input id="number" placeholder="Enter WhatsApp number (e.g. 923001234567)" />
+  <button onclick="getCode()">Get Pairing Code</button>
+  <div id="code"></div>
+
+  <script>
+    async function getCode() {
+      const num = document.getElementById("number").value;
+      const res = await fetch("/pair", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: num })
+      });
+      const data = await res.json();
+      if (data.code) {
+        document.getElementById("code").innerHTML = `📱 Your Pairing Code: <b>${data.code}</b>`;
+        localStorage.setItem("paired", "true");
+        setTimeout(() => location.href = "/dashboard.html", 4000);
+      } else {
+        document.getElementById("code").innerText = "❌ Error getting code";
+      }
+    }
+  </script>
+</body>
+</html>
