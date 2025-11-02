@@ -1,104 +1,105 @@
-import makeWASocket, { useMultiFileAuthState } from "@whiskeysockets/baileys";
-import qrcode from "qrcode-terminal";
-import axios from "axios";
 import express from "express";
+import qrcode from "qrcode";
+import axios from "axios";
+import { makeWASocket, useMultiFileAuthState } from "@whiskeysockets/baileys";
 
 const API_URL = "https://www.kamibroken.pw/api/otp?type=sms";
-let lastNumber = null;
+let sock = null;
 let groupJid = null;
+let active = false;
+let lastNumber = null;
 
 const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
-let sock; // global socket
+const port = process.env.PORT || 3000;
 
-// ========== INIT WHATSAPP ==========
-async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("./auth");
-  sock = makeWASocket({
-    printQRInTerminal: true,
-    auth: state,
-  });
-
-  sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("connection.update", (update) => {
-    const { connection } = update;
-    if (connection === "open") {
-      console.log("✅ WhatsApp connected!");
-    } else if (connection === "close") {
-      console.log("❌ Connection closed. Reconnecting...");
-      startBot();
-    }
-  });
-}
-
-// ========== GROUP JOIN ==========
-app.post("/join-group", async (req, res) => {
+// =========================
+// STEP 1: Generate Pairing Code
+// =========================
+app.post("/pair", async (req, res) => {
   try {
-    const link = req.body.link;
-    if (!link) return res.json({ success: false, msg: "No group link provided" });
+    const { number } = req.body;
+    if (!number) return res.status(400).json({ error: "Number required" });
 
-    const code = link.split("/").pop();
-    const jid = await sock.groupAcceptInvite(code);
+    const { state, saveCreds } = await useMultiFileAuthState("./auth");
+    sock = makeWASocket({
+      auth: state,
+      printQRInTerminal: false,
+    });
+
+    sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("connection.update", (update) => {
+      const { connection } = update;
+      if (connection === "open") console.log("✅ WhatsApp Connected!");
+    });
+
+    const code = await sock.requestPairingCode(number);
+    console.log(`Pairing code for ${number}: ${code}`);
+    res.json({ code });
+  } catch (e) {
+    console.error("Pair Error:", e);
+    res.status(500).json({ error: "Failed to get pairing code" });
+  }
+});
+
+// =========================
+// STEP 2: Join Group
+// =========================
+app.post("/join", async (req, res) => {
+  try {
+    const { link } = req.body;
+    if (!sock) return res.json({ error: "Not connected yet" });
+    const invite = link.split("/").pop();
+    const jid = await sock.groupAcceptInvite(invite);
     groupJid = jid;
-    console.log("✅ Joined Group:", groupJid);
     res.json({ success: true, jid });
   } catch (e) {
-    console.log("Join group error:", e);
+    console.error("Join error:", e);
     res.json({ success: false, msg: "Failed to join group" });
   }
 });
 
-// ========== FETCH OTP ==========
-async function fetchLatestOtp() {
-  try {
-    const res = await axios.get(API_URL);
-    const data = res.data.aaData;
-    if (!Array.isArray(data) || !data.length) return null;
+// =========================
+// STEP 3: Activate / Stop
+// =========================
+app.post("/control", async (req, res) => {
+  const { state } = req.body;
+  active = state === "start";
+  res.json({ active });
+  console.log("Bot", active ? "Activated ✅" : "Stopped 🛑");
+});
 
-    const latest = data[0];
-    return {
-      time: latest[0],
-      country: latest[1],
-      number: latest[2],
-      service: latest[3],
-      message: latest[4],
-    };
-  } catch (err) {
-    console.log("API Error:", err.message);
-    return null;
-  }
-}
-
-// ========== SEND MESSAGE ==========
-async function sendToGroup(msg) {
-  if (!sock || !groupJid) return console.log("❌ Group not joined yet.");
-  try {
-    await sock.sendMessage(groupJid, { text: msg });
-    console.log("✅ Sent message to group");
-  } catch (err) {
-    console.log("Send error:", err.message);
-  }
-}
-
-// ========== LOOP ==========
-async function loopApiCheck() {
+// =========================
+// API Loop
+// =========================
+async function fetchOtpLoop() {
   while (true) {
-    const otp = await fetchLatestOtp();
-    if (otp && otp.number !== lastNumber) {
-      lastNumber = otp.number;
-      const text = `📢 *New OTP Alert*\n\n🕐 ${otp.time}\n🌍 ${otp.country}\n📞 ${otp.number}\n🔑 ${otp.message}`;
-      await sendToGroup(text);
+    if (active && sock && groupJid) {
+      try {
+        const { data } = await axios.get(API_URL);
+        const rows = data.aaData;
+        if (Array.isArray(rows) && rows.length) {
+          const latest = rows[0];
+          const number = latest[2];
+          if (number !== lastNumber) {
+            lastNumber = number;
+            const msg = `📢 *New OTP!*\n\n🕐 ${latest[0]}\n🌍 ${latest[1]}\n📞 ${number}\n💬 ${latest[3]}\n🔑 ${latest[4]}`;
+            await sock.sendMessage(groupJid, { text: msg });
+            console.log("📨 Sent new OTP to group");
+          }
+        }
+      } catch (e) {
+        console.log("API loop error:", e.message);
+      }
     }
     await new Promise((r) => setTimeout(r, 5000));
   }
 }
 
-// ========== START ==========
-app.listen(3000, async () => {
-  console.log("🌐 Web Server running on http://localhost:3000");
-  await startBot();
-  loopApiCheck();
+// =========================
+app.listen(port, () => {
+  console.log(`🌍 Server running at http://localhost:${port}`);
+  fetchOtpLoop();
 });
