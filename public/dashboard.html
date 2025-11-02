@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WhatsApp Bot - Dashboard</title>
+  <style>
+    body { font-family: Arial; background: #0e1117; color: white; text-align: center; margin-top: 80px; }
+    input, button { padding: 10px; font-size: 16px; margin: 10px; border-radius: 8px; border: none; }
+    input { width: 60%; }
+    button { cursor: pointer; }
+    .start { background: #25D366; color: white; }
+    .stop { background: #f44336; color: white; }
+    #log { margin-top: 20px; color: #bbb; }
+  </style>
+</head>
+<body>
+  <h1>🟢 WhatsApp OTP Bot Dashboard</h1>
+  <input id="group" placeholder="Enter WhatsApp group link" />
+  <button onclick="joinGroup()">Join Group</button><br/>
+  <button class="start" onclick="control('start')">Activate Bot</button>
+  <button class="stop" onclick="control('stop')">Stop Bot</button>
+  <div id="log"></div>
+
+  <script>
+    if (!localStorage.getItem("paired")) {
+      location.href = "/";
+    }
+
+    async function joinGroup() {
+      const link = document.getElementById("group").value;
+      const res = await fetch("/join", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ link })
+      });
+      const data = await res.json();
+      document.getElementById("log").innerText = data.success
+        ? `✅ Joined Group: ${data.jid}`
+        : `❌ ${data.msg}`;
+    }
+
+    async function control(state) {
+      const res = await fetch("/control", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state })
+      });
+      const data = await res.json();
+      document.getElementById("log").innerText = data.active
+        ? "🟢 Bot Activated"
+        : "🔴 Bot Stopped";
+    }
+  </script>
+</body>
+</html>
