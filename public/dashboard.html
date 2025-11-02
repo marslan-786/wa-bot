@@ -1,53 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>WhatsApp Bot - Dashboard</title>
+  <meta charset="utf-8" />
+  <title>WhatsApp Bot — Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial; background: #0e1117; color: white; text-align: center; margin-top: 80px; }
-    input, button { padding: 10px; font-size: 16px; margin: 10px; border-radius: 8px; border: none; }
-    input { width: 60%; }
-    button { cursor: pointer; }
-    .start { background: #25D366; color: white; }
-    .stop { background: #f44336; color: white; }
-    #log { margin-top: 20px; color: #bbb; }
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#071027;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh}
+    .card{width:640px;padding:20px;border-radius:12px;background:#071726;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+    input{width:100%;padding:10px;border-radius:8px;border:none;margin:10px 0}
+    .btn{padding:10px 14px;border-radius:8px;border:none;margin-right:8px;cursor:pointer}
+    .start{background:#25D366;color:#060b0a;font-weight:700}
+    .stop{background:#ff5c5c;color:#fff}
+    .join{background:#2b90ff;color:#fff}
+    #log{margin-top:12px;color:#9fb0c8;white-space:pre-wrap}
   </style>
 </head>
 <body>
-  <h1>🟢 WhatsApp OTP Bot Dashboard</h1>
-  <input id="group" placeholder="Enter WhatsApp group link" />
-  <button onclick="joinGroup()">Join Group</button><br/>
-  <button class="start" onclick="control('start')">Activate Bot</button>
-  <button class="stop" onclick="control('stop')">Stop Bot</button>
-  <div id="log"></div>
+  <div class="card">
+    <h2>🟢 WhatsApp OTP Bot — Dashboard</h2>
+    <p>Enter Group invite link (chat.whatsapp.com/xxxx)</p>
+    <input id="g" placeholder="https://chat.whatsapp.com/XXXXXXXXXXXXXXXX" />
+    <button class="btn join" onclick="joinGroup()">Join Group</button>
+    <div style="margin-top:12px">
+      <button class="btn start" onclick="control('start')">Activate Bot</button>
+      <button class="btn stop" onclick="control('stop')">Stop Bot</button>
+    </div>
+    <div id="log"></div>
+  </div>
 
-  <script>
-    if (!localStorage.getItem("paired")) {
-      location.href = "/";
+<script>
+async function joinGroup(){
+  const link = document.getElementById('g').value.trim();
+  if (!link) return alert('Enter group link');
+  document.getElementById('log').innerText = 'Joining group...';
+  try{
+    const r = await fetch('/join-group',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link})});
+    const j = await r.json();
+    if (j.success) {
+      document.getElementById('log').innerText = '✅ Joined: ' + j.jid;
+    } else {
+      document.getElementById('log').innerText = '❌ ' + (j.msg || j.error || JSON.stringify(j));
     }
+  }catch(e){
+    document.getElementById('log').innerText = 'Network error: '+e.message;
+  }
+}
 
-    async function joinGroup() {
-      const link = document.getElementById("group").value;
-      const res = await fetch("/join", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ link })
-      });
-      const data = await res.json();
-      document.getElementById("log").innerText = data.success
-        ? `✅ Joined Group: ${data.jid}`
-        : `❌ ${data.msg}`;
-    }
-
-    async function control(state) {
-      const res = await fetch("/control", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ state })
-      });
-      const data = await res.json();
-      document.getElementById("log").innerText = data.active
-        ? "🟢 Bot Activated"
-        : "🔴 Bot Stopped";
-    }
-  </script>
+async function control(action){
+  document.getElementById('log').innerText = action==='start' ? 'Activating...' : 'Stopping...';
+  try{
+    const r = await fetch('/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+    const j = await r.json();
+    document.getElementById('log').innerText = j.active ? '🟢 Bot Activated' : '🔴 Bot Stopped';
+  }catch(e){
+    document.getElementById('log').innerText = 'Network error: '+e.message;
+  }
+}
+</script>
 </body>
 </html>
