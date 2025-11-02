@@ -1,69 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>WhatsApp Bot — Pair</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;display:flex;align-items:center;justify-content:center;height:100vh;background:#0b1220;color:#fff}
-    .card{width:360px;padding:20px;border-radius:12px;background:#0f1724;box-shadow:0 6px 18px rgba(0,0,0,.6);text-align:center}
-    input{width:100%;padding:10px;border-radius:8px;border:none;margin:10px 0;font-size:16px}
-    button{padding:10px 16px;border-radius:8px;border:none;background:#25D366;color:#000;font-weight:700;cursor:pointer}
-    .info{margin-top:12px;color:#9aa7bf;font-size:14px}
-    code{display:block;margin-top:12px;background:#071226;padding:8px;border-radius:6px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f2f5; display: grid; place-items: center; min-height: 100vh; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 400px; }
+        .page { display: none; } /* صفحات کو چھپانا */
+        .page.active { display: block; } /* فعال صفحہ دکھانا */
+        input { width: 100%; padding: 12px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; }
+        button { background: #00a884; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; }
+        button:hover { background: #008a6e; }
+        #status { margin-top: 15px; font-weight: bold; }
+        #pairingCodeDisplay { font-size: 1.5rem; font-weight: bold; color: #128c7e; text-align: center; margin: 15px 0; }
+    </style>
 </head>
 <body>
-  <div class="card">
-    <h2>🔗 WhatsApp Pairing</h2>
-    <p class="info">Enter number with + and country code (example: +923001234567)</p>
-    <input id="num" placeholder="+923001234567" />
-    <button onclick="getPair()">Get Pairing Code</button>
-    <div id="result"></div>
-  </div>
 
-<script>
-async function getPair(){
-  const num = document.getElementById('num').value.trim();
-  document.getElementById('result').innerText = "Requesting pairing code...";
-  try{
-    const res = await fetch('/pair', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ number: num })
-    });
-    const j = await res.json();
-    if (j.status === 'pair_code' && j.code) {
-      document.getElementById('result').innerHTML = `<p>📱 Pairing Code:</p><code id="paircode">${j.code}</code><p style="font-size:13px;color:#9aa7bf">Enter this code inside WhatsApp → Link a device → Enter code</p>`;
-      // poll status and redirect when connected
-      pollStatusAndRedirect();
-    } else if (j.status === 'connected') {
-      document.getElementById('result').innerHTML = `<p style="color:#8ad88a">Already connected ✅ — redirecting...</p>`;
-      setTimeout(()=> location.href = '/dashboard.html',1200);
-    } else if (j.error) {
-      document.getElementById('result').innerText = "Error: "+ j.error;
-    } else {
-      document.getElementById('result').innerText = JSON.stringify(j);
-    }
-  }catch(e){
-    document.getElementById('result').innerText = "Network error: "+e.message;
-  }
-}
+    <div class="container">
+        <div id="authPage" class="page active">
+            <h2>WhatsApp Bot Login</h2>
+            <p>اپنا واٹس ایپ فون نمبر ملکی کوڈ کے ساتھ درج کریں۔ (مثال: 923001234567)</p>
+            <input type="text" id="phoneNumber" placeholder="923001234567">
+            <button id="getCodeButton">Get Pairing Code</button>
+            <div id="authStatus" style="color:red; margin-top:10px;"></div>
+        </div>
 
-async function pollStatusAndRedirect(){
-  const check = async ()=>{
-    try{
-      const r = await fetch('/status');
-      const j = await r.json();
-      if (j.connected) {
-        // connected → go to dashboard
-        location.href = '/dashboard.html';
-        return;
-      }
-    }catch(e){}
-    setTimeout(check,2000);
-  };
-  setTimeout(check,2000);
-}
-</script>
+        <div id="pairingPage" class="page">
+            <h2>Enter Code on Your Phone</h2>
+            <p>یہ کوڈ اپنے فون پر درج کریں:</p>
+            <div id="pairingCodeDisplay"></div>
+            <p style="text-align: center;">WhatsApp &gt; Linked Devices &gt; Link with phone number</p>
+            <p id="pairingStatus" style="text-align: center;">Waiting for confirmation...</p>
+        </div>
+
+        <div id="dashboardPage" class="page">
+            <h2>Bot Activated!</h2>
+            <p>اب، اپنے واٹس ایپ گروپ کا انوائٹ لنک درج کریں جس میں بوٹ کو شامل کرنا ہے۔</p>
+            <input type="text" id="groupLink" placeholder="https://chat.whatsapp.com/...">
+            <button id="activateButton">Activate Bot</button>
+            <div id="dashboardStatus" style="color:green; margin-top:10px;"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/script.js"></script>
 </body>
 </html>
