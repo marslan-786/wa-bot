@@ -1,38 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>WhatsApp Bot - Pair</title>
+  <meta charset="utf-8" />
+  <title>WhatsApp Bot — Pair</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial; background: #0e1117; color: white; text-align: center; margin-top: 80px; }
-    input, button { padding: 10px; font-size: 16px; margin: 10px; border-radius: 8px; border: none; }
-    input { width: 250px; }
-    button { background: #25D366; color: white; cursor: pointer; }
-    #code { margin-top: 20px; font-size: 20px; color: #25D366; }
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;display:flex;align-items:center;justify-content:center;height:100vh;background:#0b1220;color:#fff}
+    .card{width:360px;padding:20px;border-radius:12px;background:#0f1724;box-shadow:0 6px 18px rgba(0,0,0,.6);text-align:center}
+    input{width:100%;padding:10px;border-radius:8px;border:none;margin:10px 0;font-size:16px}
+    button{padding:10px 16px;border-radius:8px;border:none;background:#25D366;color:#000;font-weight:700;cursor:pointer}
+    .info{margin-top:12px;color:#9aa7bf;font-size:14px}
+    code{display:block;margin-top:12px;background:#071226;padding:8px;border-radius:6px}
   </style>
 </head>
 <body>
-  <h1>🔗 WhatsApp Pairing</h1>
-  <input id="number" placeholder="Enter WhatsApp number (e.g. 923001234567)" />
-  <button onclick="getCode()">Get Pairing Code</button>
-  <div id="code"></div>
+  <div class="card">
+    <h2>🔗 WhatsApp Pairing</h2>
+    <p class="info">Enter number with + and country code (example: +923001234567)</p>
+    <input id="num" placeholder="+923001234567" />
+    <button onclick="getPair()">Get Pairing Code</button>
+    <div id="result"></div>
+  </div>
 
-  <script>
-    async function getCode() {
-      const num = document.getElementById("number").value;
-      const res = await fetch("/pair", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ number: num })
-      });
-      const data = await res.json();
-      if (data.code) {
-        document.getElementById("code").innerHTML = `📱 Your Pairing Code: <b>${data.code}</b>`;
-        localStorage.setItem("paired", "true");
-        setTimeout(() => location.href = "/dashboard.html", 4000);
-      } else {
-        document.getElementById("code").innerText = "❌ Error getting code";
-      }
+<script>
+async function getPair(){
+  const num = document.getElementById('num').value.trim();
+  document.getElementById('result').innerText = "Requesting pairing code...";
+  try{
+    const res = await fetch('/pair', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ number: num })
+    });
+    const j = await res.json();
+    if (j.status === 'pair_code' && j.code) {
+      document.getElementById('result').innerHTML = `<p>📱 Pairing Code:</p><code id="paircode">${j.code}</code><p style="font-size:13px;color:#9aa7bf">Enter this code inside WhatsApp → Link a device → Enter code</p>`;
+      // poll status and redirect when connected
+      pollStatusAndRedirect();
+    } else if (j.status === 'connected') {
+      document.getElementById('result').innerHTML = `<p style="color:#8ad88a">Already connected ✅ — redirecting...</p>`;
+      setTimeout(()=> location.href = '/dashboard.html',1200);
+    } else if (j.error) {
+      document.getElementById('result').innerText = "Error: "+ j.error;
+    } else {
+      document.getElementById('result').innerText = JSON.stringify(j);
     }
-  </script>
+  }catch(e){
+    document.getElementById('result').innerText = "Network error: "+e.message;
+  }
+}
+
+async function pollStatusAndRedirect(){
+  const check = async ()=>{
+    try{
+      const r = await fetch('/status');
+      const j = await r.json();
+      if (j.connected) {
+        // connected → go to dashboard
+        location.href = '/dashboard.html';
+        return;
+      }
+    }catch(e){}
+    setTimeout(check,2000);
+  };
+  setTimeout(check,2000);
+}
+</script>
 </body>
 </html>
